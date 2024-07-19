@@ -1,0 +1,39 @@
+# from fastapi import FastAPI
+# from pydantic import BaseModel
+# from typing import List
+
+# app = FastAPI()
+
+# # Sample data storage
+# data = [{"id": 1, "po_number": "PO12345", "date": "2023-01-01", "contact": "1234567890", "address": "123 Main St"}, 
+#         {"id": 2, "po_number": "PO67890", "date": "2023-02-01", "contact": "0987654321", "address": "456 Elm St"}]
+
+# # Define data model
+# class Item(BaseModel):
+#     id: int
+#     po_number: str
+#     date: str
+#     contact: str
+#     address: str
+
+# @app.get("/items", response_model=List[Item])
+# def get_items():
+#     return data
+
+# @app.put("/items/{item_id}", response_model=Item)
+# def update_item(item_id: int, item: Item):
+#     for i in range(len(data)):
+#         if data[i]["id"] == item_id:
+#             data[i] = item.dict()
+#             return data[i]
+#     return {"error": "Item not found"}
+
+# @app.post("/items", response_model=Item)
+# def create_item(item: Item):
+#     # Add the new item to the data list
+#     data.append(item.dict())
+#     return item
+
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,0 +1,1367 @@
+
+import 'package:flutter/material.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold();
+  }
+}
+============
+// import 'package:doxie/edit_page.dart';
+import 'package:doxie/edit_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart' show ByteData, rootBundle;
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
+
+class NextPage extends StatefulWidget {
+  const NextPage({super.key});
+
+  @override
+  _NextPageState createState() => _NextPageState();
+}
+
+class _NextPageState extends State<NextPage> {
+  late Future<String> _pdfPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _pdfPath = _loadPDF();
+  }
+
+  Future<void> requestPermissions() async {
+    if (await Permission.storage.request().isGranted) {
+      // Permissions are granted, continue with your task
+    } else {
+      // Handle the case when permissions are not granted
+    }
+  }
+
+  Future<String> _loadPDF() async {
+    final ByteData data =
+        await rootBundle.load('lib/assets/2-invoice for accouting.PDF');
+    final Directory tempDir = await getTemporaryDirectory();
+    final File tempFile = File('${tempDir.path}/sample.pdf');
+    await tempFile.writeAsBytes(data.buffer.asUint8List(), flush: true);
+    return tempFile.path;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            FutureBuilder<void>(
+              future: requestPermissions(), // Request permissions
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done) {
+                  return FutureBuilder<String>(
+                    future: _pdfPath,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Container(
+                          height: 320,
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      } else if (snapshot.hasError ||
+                          !snapshot.hasData ||
+                          snapshot.data!.isEmpty) {
+                        print('Error loading PDF: ${snapshot.error}');
+                        return Container(
+                          height: 320,
+                          child: Center(child: Text('Error loading PDF')),
+                        );
+                      } else {
+                        return Column(
+                          children: [
+                            GestureDetector(
+                              onHorizontalDragEnd: (details) {
+                                if (details.velocity.pixelsPerSecond.dx < 0) {
+                                  // Swiped left
+                                  _navigateToOtherPage(context);
+                                }
+                              },
+                              child: Container(
+                                height: 320,
+                                child: PDFView(
+                                  filePath: snapshot.data!,
+                                  enableSwipe: true,
+                                  swipeHorizontal: true,
+                                  autoSpacing: false,
+                                  pageFling: false,
+                                  onError: (error) {
+                                    print('PDFView error: $error');
+                                  },
+                                  onRender: (_pages) {
+                                    print(
+                                        'Document rendered with $_pages pages');
+                                  },
+                                  onViewCreated:
+                                      (PDFViewController pdfViewController) {
+                                    print('PDF view created');
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    },
+                  );
+                } else {
+                  return Container(
+                    height: 320,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: _buildForm(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToOtherPage(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PdfEditing(
+          onSave: () {
+            // Perform any action needed on save, like refreshing data
+            print("Data saved, perform any necessary actions here.");
+          },
+          originRoute: '', pdfPath: '',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildFormHeader(),
+        const SizedBox(height: 8),
+        _buildTextField(height: 56),
+        const SizedBox(height: 12),
+        _buildLabel("Date"),
+        const SizedBox(height: 8),
+        _buildTextField(
+          height: 50,
+          suffixIcon: Icons.calendar_today_rounded,
+          suffixIconColor: Colors.black54,
+        ),
+        const SizedBox(height: 16),
+        _buildLabel("Contact"),
+        const SizedBox(height: 8),
+        _buildTextField(height: 50),
+        const SizedBox(height: 16),
+        _buildLabel("Address"),
+        const SizedBox(height: 8),
+        _buildTextField(height: 130, expands: true, maxLines: null),
+      ],
+    );
+  }
+
+  Widget _buildFormHeader() {
+    return const Row(
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Please fill in the details",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 24,
+              ),
+            ),
+            Text(
+              "PO",
+              style: TextStyle(
+                color: Colors.black87,
+                fontSize: 24,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Colors.black87,
+        fontSize: 24,
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    String hintText = "",
+    double height = 50,
+    bool expands = false,
+    int? maxLines,
+    IconData? suffixIcon,
+    Color? suffixIconColor,
+  }) {
+    return Container(
+      height: height,
+      child: TextField(
+        // controller: TextEditingController(text: initialValue),
+        expands: expands,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(
+            color: Colors.black54,
+            fontSize: 20,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          fillColor: Colors.white,
+          filled: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.black), // Black border
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.black), // Black border
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.black), // Black border
+          ),
+          suffixIcon: suffixIcon != null
+              ? IconTheme(
+                  data: IconThemeData(color: suffixIconColor),
+                  child: Icon(suffixIcon),
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+///////////editing
+
+// class PdfEditing extends StatefulWidget {
+//   final VoidCallback onSave;
+
+//   const PdfEditing(
+//       {Key? key, required this.onSave, required String originRoute, required String pdfPath})
+//       : super(key: key);
+
+//   @override
+//   State<PdfEditing> createState() => _PdfEditingState();
+// }
+
+// class _PdfEditingState extends State<PdfEditing> {
+//   late Future<String> _pdfPath;
+//   TextEditingController poNumberController = TextEditingController();
+//   TextEditingController dateController = TextEditingController();
+//   TextEditingController contactController = TextEditingController();
+//   TextEditingController addressController = TextEditingController();
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _pdfPath = _loadPDF();
+//   }
+
+//   Future<String> _loadPDF() async {
+//     final ByteData data =
+//         await rootBundle.load('lib/assets/2-invoice for accouting.PDF');
+//     final Directory tempDir = await getTemporaryDirectory();
+//     final File tempFile = File('${tempDir.path}/sample.pdf');
+//     await tempFile.writeAsBytes(data.buffer.asUint8List(), flush: true);
+//     return tempFile.path;
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       backgroundColor: Colors.white,
+//       appBar: AppBar(
+//         leading: Icon(
+//           Icons.chevron_left_rounded,
+//           size: 50,
+//           color: Colors.red,
+//         ),
+//         centerTitle: true,
+//         elevation: 0,
+//         backgroundColor: Colors.transparent,
+//         title: Padding(
+//           padding: const EdgeInsets.only(left: 80),
+//           child: Row(
+//             children: [
+//               Image.asset(
+//                 'lib/assets/Doxie_logo.png',
+//                 fit: BoxFit.contain,
+//                 height: 30, // Adjust the height as needed
+//               ),
+//               const SizedBox(
+//                 width: 10,
+//               ),
+//               ShaderMask(
+//                 shaderCallback: (Rect bounds) {
+//                   return const LinearGradient(
+//                     begin: Alignment.centerLeft,
+//                     end: Alignment.centerRight,
+//                     colors: [Colors.white, Colors.white],
+//                   ).createShader(bounds);
+//                 },
+//                 child: const Text(
+//                   'DOXIE',
+//                   style: TextStyle(
+//                     color: Color(0xFF0E0C0D),
+//                     fontSize: 20,
+//                     letterSpacing: 6,
+//                     fontFamily: 'ROBOT',
+//                   ),
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//       body: SingleChildScrollView(
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             _buildHeader(),
+//             const SizedBox(height: 16),
+//             Padding(
+//               padding: const EdgeInsets.symmetric(horizontal: 16.0),
+//               child: _buildForm(),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildHeader() {
+//     return FutureBuilder<String>(
+//       future: _pdfPath,
+//       builder: (context, snapshot) {
+//         if (snapshot.connectionState == ConnectionState.waiting) {
+//           return Container(
+//             height: 320,
+//             width: double.infinity,
+//             color: Colors.grey[300],
+//             child: Center(child: CircularProgressIndicator()),
+//           );
+//         } else if (snapshot.hasError ||
+//             !snapshot.hasData ||
+//             snapshot.data!.isEmpty) {
+//           return Container(
+//             height: 320,
+//             width: double.infinity,
+//             color: Colors.grey[300],
+//             child: Center(child: Text('Error loading PDF')),
+//           );
+//         } else {
+//           return Container(
+//             height: 320,
+//             width: double.infinity,
+//             child: PDFView(
+//               filePath: snapshot.data!,
+//               enableSwipe: true,
+//               swipeHorizontal: true, // Enable horizontal swipe
+//               autoSpacing: true, // Auto spacing between pages
+//               pageFling: true, // Allows fling gesture to change page
+//               onError: (error) {
+//                 print('PDFView error: $error');
+//               },
+//               onRender: (_pages) {
+//                 print('Document rendered with $_pages pages');
+//               },
+//               onViewCreated: (PDFViewController pdfViewController) {
+//                 print('PDF view created');
+//               },
+//             ),
+//           );
+//         }
+//       },
+//     );
+//   }
+
+//   Widget _buildGradientButton() {
+//     return Container(
+//       decoration: BoxDecoration(
+//         gradient: LinearGradient(
+//           begin: Alignment.topCenter,
+//           end: Alignment.bottomCenter,
+//           colors: [
+//             Color(0xFFFD4552), // The color #FD4552 in hexadecimal
+//             Color(0xFFF5082A), // The color #F5082A in hexadecimal
+//           ],
+//         ),
+//         borderRadius: BorderRadius.circular(6),
+//       ),
+//       child: ElevatedButton(
+//         onPressed: () {
+//           widget.onSave(); // Call the callback function on save
+//           Navigator.pop(context); // Navigate back
+//         },
+//         style: ElevatedButton.styleFrom(
+//           backgroundColor: Colors.transparent,
+//           shadowColor: Colors.transparent,
+//           padding: EdgeInsets.symmetric(vertical: 16),
+//           shape: RoundedRectangleBorder(
+//             borderRadius: BorderRadius.circular(6),
+//           ),
+//           elevation: 3,
+//         ),
+//         child: Text(
+//           'Save',
+//           style: TextStyle(
+//             fontSize: 18,
+//             color: Colors.white,
+//             fontFamily: 'Lato',
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildForm() {
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         Row(
+//           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//           children: [
+//             Expanded(
+//               child: _buildFormHeader(),
+//             ),
+//             _buildGradientButton(),
+//           ],
+//         ),
+//         const SizedBox(height: 8),
+//         _buildTextField(
+//           controller: poNumberController,
+//           hintText: "Enter PO Number",
+//           height: 56,
+//         ),
+//         const SizedBox(height: 12),
+//         _buildLabel("Date"),
+//         const SizedBox(height: 8),
+//         _buildTextField(
+//           controller: dateController,
+//           hintText: "Select Date",
+//           height: 50,
+//           suffixIcon: Icons.calendar_today_rounded,
+//           suffixIconColor: Colors.black54,
+//         ),
+//         const SizedBox(height: 16),
+//         _buildLabel("Contact"),
+//         const SizedBox(height: 8),
+//         _buildTextField(
+//           controller: contactController,
+//           hintText: "Enter Contact",
+//           height: 50,
+//         ),
+//         const SizedBox(height: 16),
+//         _buildLabel("Address"),
+//         const SizedBox(height: 8),
+//         _buildTextField(
+//           controller: addressController,
+//           hintText: "Enter Address",
+//           height: 130,
+//           expands: true,
+//           maxLines: null,
+//         ),
+//       ],
+//     );
+//   }
+
+//   Widget _buildFormHeader() {
+//     return const Row(
+//       children: [
+//         Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Text(
+//               "Please fill in the details",
+//               style: TextStyle(
+//                 fontWeight: FontWeight.bold,
+//                 fontSize: 24,
+//               ),
+//             ),
+//             Text(
+//               "PO",
+//               style: TextStyle(
+//                 color: Colors.black87,
+//                 fontSize: 24,
+//               ),
+//             ),
+//           ],
+//         ),
+//       ],
+//     );
+//   }
+
+//   Widget _buildLabel(String text) {
+//     return Text(
+//       text,
+//       style: const TextStyle(
+//         color: Colors.black87,
+//         fontSize: 24,
+//       ),
+//     );
+//   }
+
+//   Widget _buildTextField({
+//     required TextEditingController controller,
+//     String hintText = "",
+//     double height = 50,
+//     bool expands = false,
+//     int? maxLines,
+//     IconData? suffixIcon,
+//     Color? suffixIconColor,
+//   }) {
+//     return Container(
+//       height: height,
+//       child: TextField(
+//         controller: controller,
+//         expands: expands,
+//         maxLines: maxLines,
+//         decoration: InputDecoration(
+//           hintText: hintText,
+//           hintStyle: const TextStyle(
+//             color: Colors.black54,
+//             fontSize: 20,
+//           ),
+//           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+//           fillColor: Colors.grey[200],
+//           filled: true,
+//           border: OutlineInputBorder(
+//             borderRadius: BorderRadius.circular(8),
+//             borderSide: const BorderSide(color: Colors.black), // Black border
+//           ),
+//           enabledBorder: OutlineInputBorder(
+//             borderRadius: BorderRadius.circular(8),
+//             borderSide: const BorderSide(color: Colors.black), // Black border
+//           ),
+//           focusedBorder: OutlineInputBorder(
+//             borderRadius: BorderRadius.circular(8),
+//             borderSide: const BorderSide(color: Colors.black), // Black border
+//           ),
+//           suffixIcon: suffixIcon != null
+//               ? IconTheme(
+//                   data: IconThemeData(color: suffixIconColor),
+//                   child: Icon(suffixIcon),
+//                 )
+//               : null,
+//         ),
+//       ),
+//     );
+//   }
+// }
+===============================================
+
+
+///////////editing
+
+
+
+// class PdfEditing extends StatefulWidget {
+//   final VoidCallback onSave;
+
+//   const PdfEditing({Key? key, required this.onSave, required String originRoute, required String pdfPath}) : super(key: key);
+
+//   @override
+//   State<PdfEditing> createState() => _PdfEditingState();
+// }
+
+// class _PdfEditingState extends State<PdfEditing> {
+//   late Future<String> _pdfPath;
+//   TextEditingController poNumberController = TextEditingController();
+//   TextEditingController dateController = TextEditingController();
+//   TextEditingController contactController = TextEditingController();
+//   TextEditingController addressController = TextEditingController();
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _pdfPath = _loadPDF();
+//   }
+
+//   Future<String> _loadPDF() async {
+//     final ByteData data =
+//         await rootBundle.load('lib/assets/DoNotReplywal-mart.com_20230102_160505 (1)-2.pdf');
+//     final Directory tempDir = await getTemporaryDirectory();
+//     final File tempFile = File('${tempDir.path}/sample.pdf');
+//     await tempFile.writeAsBytes(data.buffer.asUint8List(), flush: true);
+//     return tempFile.path;
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       backgroundColor: Colors.white,
+//       appBar: AppBar(
+//         leading: Icon(
+//           Icons.chevron_left_rounded,
+//           size: 50,
+//           color: Colors.red,
+//         ),
+//         centerTitle: true,
+//         elevation: 0,
+//         backgroundColor: Colors.transparent,
+//         title: Padding(
+//           padding: const EdgeInsets.only(left: 80),
+//           child: Row(
+//             children: [
+//               Image.asset(
+//                 'lib/assets/Doxie_logo.png',
+//                 fit: BoxFit.contain,
+//                 height: 30, // Adjust the height as needed
+//               ),
+//               const SizedBox(
+//                 width: 10,
+//               ),
+//               ShaderMask(
+//                 shaderCallback: (Rect bounds) {
+//                   return const LinearGradient(
+//                     begin: Alignment.centerLeft,
+//                     end: Alignment.centerRight,
+//                     colors: [Colors.white, Colors.white],
+//                   ).createShader(bounds);
+//                 },
+//                 child: const Text(
+//                   'DOXIE',
+//                   style: TextStyle(
+//                     color: Color(0xFF0E0C0D),
+//                     fontSize: 20,
+//                     letterSpacing: 6,
+//                     fontFamily: 'ROBOT',
+//                   ),
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//       body: SingleChildScrollView(
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             _buildHeader(),
+//             const SizedBox(height: 16),
+//             Padding(
+//               padding: const EdgeInsets.symmetric(horizontal: 16.0),
+//               child: _buildForm(),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildHeader() {
+//     return FutureBuilder<String>(
+//       future: _pdfPath,
+//       builder: (context, snapshot) {
+//         if (snapshot.connectionState == ConnectionState.waiting) {
+//           return Container(
+//             height: 320,
+//             width: double.infinity,
+//             color: Colors.grey[300],
+//             child: Center(child: CircularProgressIndicator()),
+//           );
+//         } else if (snapshot.hasError ||
+//             !snapshot.hasData ||
+//             snapshot.data!.isEmpty) {
+//           return Container(
+//             height: 320,
+//             width: double.infinity,
+//             color: Colors.grey[300],
+//             child: Center(child: Text('Error loading PDF')),
+//           );
+//         } else {
+//           return Container(
+//             height: 320,
+//             width: double.infinity,
+//             child: PDFView(
+//               filePath: snapshot.data!,
+//               enableSwipe: true,
+//               swipeHorizontal: true, // Enable horizontal swipe
+//               autoSpacing: true, // Auto spacing between pages
+//               pageFling: true, // Allows fling gesture to change page
+//               onError: (error) {
+//                 print('PDFView error: $error');
+//               },
+//               onRender: (_pages) {
+//                 print('Document rendered with $_pages pages');
+//               },
+//               onViewCreated: (PDFViewController pdfViewController) {
+//                 print('PDF view created');
+//               },
+//             ),
+//           );
+//         }
+//       },
+//     );
+//   }
+
+//   Widget _buildGradientButton() {
+//     return Container(
+//       decoration: BoxDecoration(
+//         gradient: LinearGradient(
+//           begin: Alignment.topCenter,
+//           end: Alignment.bottomCenter,
+//           colors: [
+//             Color(0xFFFD4552), // The color #FD4552 in hexadecimal
+//             Color(0xFFF5082A), // The color #F5082A in hexadecimal
+//           ],
+//         ),
+//         borderRadius: BorderRadius.circular(6),
+//       ),
+//       child: ElevatedButton(
+//         onPressed: () {
+//           widget.onSave(); // Call the callback function on save
+//           Navigator.pop(context); // Navigate back
+//         },
+//         style: ElevatedButton.styleFrom(
+//           backgroundColor: Colors.transparent,
+//           shadowColor: Colors.transparent,
+//           padding: EdgeInsets.symmetric(vertical: 16),
+//           shape: RoundedRectangleBorder(
+//             borderRadius: BorderRadius.circular(6),
+//           ),
+//           elevation: 3,
+//         ),
+//         child: Text(
+//           'Save',
+//           style: TextStyle(
+//             fontSize: 18,
+//             color: Colors.white,
+//             fontFamily: 'Lato',
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildForm() {
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         Row(
+//           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//           children: [
+//             Expanded(
+//               child: _buildFormHeader(),
+//             ),
+//             _buildGradientButton(),
+//           ],
+//         ),
+//         const SizedBox(height: 8),
+//         _buildTextField(
+//           controller: poNumberController,
+//           hintText: "Enter PO Number",
+//           height: 56,
+//         ),
+//         const SizedBox(height: 12),
+//         _buildLabel("Date"),
+//         const SizedBox(height: 8),
+//         _buildTextField(
+//           controller: dateController,
+//           hintText: "Select Date",
+//           height: 50,
+//           suffixIcon: Icons.calendar_today_rounded,
+//           suffixIconColor: Colors.black54,
+//         ),
+//         const SizedBox(height: 16),
+//         _buildLabel("Contact"),
+//         const SizedBox(height: 8),
+//         _buildTextField(
+//           controller: contactController,
+//           hintText: "Enter Contact",
+//           height: 50,
+//         ),
+//         const SizedBox(height: 16),
+//         _buildLabel("Address"),
+//         const SizedBox(height: 8),
+//         _buildTextField(
+//           controller: addressController,
+//           hintText: "Enter Address",
+//           height: 130,
+//           expands: true,
+//           maxLines: null,
+//         ),
+//       ],
+//     );
+//   }
+
+//   Widget _buildFormHeader() {
+//     return const Row(
+//       children: [
+//         Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Text(
+//               "Please fill in the details",
+//               style: TextStyle(
+//                 fontWeight: FontWeight.bold,
+//                 fontSize: 24,
+//               ),
+//             ),
+//             Text(
+//               "PO",
+//               style: TextStyle(
+//                 color: Colors.black87,
+//                 fontSize: 24,
+//               ),
+//             ),
+//           ],
+//         ),
+//       ],
+//     );
+//   }
+
+//   Widget _buildLabel(String text) {
+//     return Text(
+//       text,
+//       style: const TextStyle(
+//         color: Colors.black87,
+//         fontSize: 24,
+//       ),
+//     );
+//   }
+
+//   Widget _buildTextField({
+//     required TextEditingController controller,
+//     String hintText = "",
+//     double height = 50,
+//     bool expands = false,
+//     int? maxLines,
+//     IconData? suffixIcon,
+//     Color? suffixIconColor,
+//   }) {
+//     return Container(
+//       height: height,
+//       child: TextField(
+//         controller: controller,
+//         expands: expands,
+//         maxLines: maxLines,
+//         decoration: InputDecoration(
+//           hintText: hintText,
+//           hintStyle: const TextStyle(
+//             color: Colors.black54,
+//             fontSize: 20,
+//           ),
+//           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+//           fillColor: Colors.grey[200],
+//           filled: true,
+//           border: OutlineInputBorder(
+//             borderRadius: BorderRadius.circular(8),
+//             borderSide: const BorderSide(color: Colors.black), // Black border
+//           ),
+//           enabledBorder: OutlineInputBorder(
+//             borderRadius: BorderRadius.circular(8),
+//             borderSide: const BorderSide(color: Colors.black), // Black border
+//           ),
+//           focusedBorder: OutlineInputBorder(
+//             borderRadius: BorderRadius.circular(8),
+//             borderSide: const BorderSide(color: Colors.black), // Black border
+//           ),
+//           suffixIcon: suffixIcon != null
+//               ? IconTheme(
+//                   data: IconThemeData(color: suffixIconColor),
+//                   child: Icon(suffixIcon),
+//                 )
+//               : null,
+//         ),
+//       ),
+//     );
+//   }
+// }
+==========================
+import 'package:doxie/pages/afternext.dart';
+import 'package:flutter/material.dart';
+// import 'package:doxie/edit_page.dart';
+import 'package:doxie/pages/main_page.dart';
+import 'package:doxie/pages/next_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late PageController _pageController;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
+    _loadPageIndex();
+  }
+
+  Future<void> _loadPageIndex() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    int savedIndex = prefs.getInt('currentIndex') ?? 0;
+    setState(() {
+      _currentIndex = savedIndex;
+      if (_currentIndex != 0) {
+        _pageController.jumpToPage(_currentIndex);
+      }
+    });
+  }
+
+  Future<void> _savePageIndex(int index) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('currentIndex', index);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: HomeScreen(
+        pageController: _pageController,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+            _savePageIndex(index);
+          });
+        },
+        currentIndex: _currentIndex,
+      ),
+    );
+  }
+}
+
+class HomeScreen extends StatelessWidget {
+  final PageController pageController;
+  final Function(int) onPageChanged;
+  final int currentIndex;
+
+  const HomeScreen({
+    super.key,
+    required this.pageController,
+    required this.onPageChanged,
+    required this.currentIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        leading: Icon(
+          Icons.chevron_left_rounded,
+          size: 50,
+          color: Colors.red,
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: Padding(
+          padding: const EdgeInsets.only(left: 80),
+          child: Row(
+            children: [
+              Image.asset(
+                'lib/assets/Doxie_logo.png',
+                fit: BoxFit.contain,
+                height: 30, // Adjust the height as needed
+              ),
+              const SizedBox(
+                width: 10,
+              ),
+              ShaderMask(
+                shaderCallback: (Rect bounds) {
+                  return const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Colors.white, Colors.white],
+                  ).createShader(bounds);
+                },
+                child: const Text(
+                  'DOXIE',
+                  style: TextStyle(
+                    color: Color(0xFF0E0C0D),
+                    fontSize: 20,
+                    letterSpacing: 6,
+                    fontFamily: 'ROBOT',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      body: Stack(
+        children: [
+          PageView(
+            controller: pageController,
+            onPageChanged: onPageChanged,
+            children: <Widget>[
+              AfterNextPage(),
+              NextPage(),
+
+              MainPage(),
+
+              // PdfEditing(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+================================
+
+  Widget _buildForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        _buildFormHeader(),
+        const SizedBox(height: 8),
+        _buildTextField(controller: poNumberController, 
+        // height: 50, 
+        minLines: 1),
+        const SizedBox(height: 12),
+        _buildLabel("Date"),
+        const SizedBox(height: 8),
+        _buildTextField(
+          controller: dateController,
+          // height: 50,
+          suffixIcon: Icons.calendar_today_rounded,
+          suffixIconColor: Colors.black54,
+          minLines: 1,
+        ),
+        const SizedBox(height: 16),
+        _buildLabel("Contact"),
+        const SizedBox(height: 8),
+        _buildTextField(controller: contactController,
+        //  height: 50,
+          minLines: 1),
+        const SizedBox(height: 16),
+        _buildLabel("Address"),
+        const SizedBox(height: 8),
+        _buildTextField(
+          controller: addressController,
+          // height: 130,
+          expands: true, 
+          // minLines: 5,
+          maxLines: 5,
+          minLines: 5,
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildFormHeader() {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Please fill in the details",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 24,
+                ),
+              ),
+              Text(
+                "PO",
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 24,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _buildGradientButton(), // Edit button
+      ],
+    );
+  }
+
+  Widget _buildGradientButton() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFFD4552), // The color #FD4552 in hexadecimal
+            Color(0xFFF5082A), // The color #F5082A in hexadecimal
+          ],
+        ),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: ElevatedButton(
+        onPressed: () {
+          // Perform save operation
+          widget.onSave(); // Call the onSave callback
+          Navigator.pop(context); // Navigate back to previous screen after save
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          padding: EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+          ),
+          elevation: 3,
+        ),
+        child: Text(
+          'Save',
+          style: TextStyle(
+            fontSize: 18,
+            color: Colors.white,
+            fontFamily: 'Lato',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Colors.black87,
+        fontSize: 24,
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    String hintText = "",
+    // double height = 50,
+    bool expands = false,
+    int? maxLines,
+    IconData? suffixIcon,
+    Color? suffixIconColor,
+    required int minLines,
+  }) {
+    return Container(
+      // height: height,
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        minLines: minLines,
+        expands: expands,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(
+            color: Colors.black54,
+            fontSize: 20,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          fillColor: Colors.grey[200],
+          filled: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: Colors.black), // Black border
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: Colors.black), // Black border
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: Colors.black), // Black border
+          ),
+          suffixIcon: suffixIcon != null
+              ? IconTheme(
+                  data: IconThemeData(color: suffixIconColor),
+                  child: Icon(suffixIcon),
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+}
+=============================
+import 'package:doxie/pages/afternext.dart';
+import 'package:flutter/material.dart';
+import 'package:doxie/pages/main_page.dart';
+import 'package:doxie/pages/next_page.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late PageController _pageController;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
+    _loadPageIndex();
+  }
+
+  Future<void> _loadPageIndex() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    int savedIndex = prefs.getInt('currentIndex') ?? 0;
+    setState(() {
+      _currentIndex = savedIndex;
+      if (_currentIndex != 0) {
+        _pageController.jumpToPage(_currentIndex);
+      }
+    });
+  }
+
+  Future<void> _savePageIndex(int index) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('currentIndex', index);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScreenUtilInit(
+      designSize: const Size(360, 690),
+      builder: (_, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: HomeScreen(
+            pageController: _pageController,
+            onPageChanged: (index) {
+              setState(() {
+                _currentIndex = index;
+                _savePageIndex(index);
+              });
+            },
+            currentIndex: _currentIndex,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class HomeScreen extends StatelessWidget {
+  final PageController pageController;
+  final Function(int) onPageChanged;
+  final int currentIndex;
+
+  const HomeScreen({
+    super.key,
+    required this.pageController,
+    required this.onPageChanged,
+    required this.currentIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: SvgPicture.asset(
+            "lib/assets/chevron-left",
+            color: Colors.red,
+            width: 32.w,
+            height: 32.h,
+          ),
+          onPressed: () {},
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: Padding(
+          padding: EdgeInsets.only(left: 70.w),
+          child: Row(
+            children: [
+              Image.asset(
+                'lib/assets/Doxie_logo.png',
+                fit: BoxFit.contain,
+                height: 30.h,
+              ),
+              SizedBox(
+                width: 10.w,
+              ),
+              ShaderMask(
+                shaderCallback: (Rect bounds) {
+                  return LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Colors.white, Colors.white],
+                  ).createShader(bounds);
+                },
+                child: Text(
+                  'DOXIE',
+                  style: TextStyle(
+                    color: Color(0xFF0E0C0D),
+                    fontSize: 20.sp,
+                    letterSpacing: 6,
+                    fontFamily: 'ROBOT',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      body: Stack(
+        children: [
+          PageView(
+            controller: pageController,
+            onPageChanged: onPageChanged,
+            children: const <Widget>[
+              AfterNextPage(),
+              NextPage(),
+              MainPage(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
